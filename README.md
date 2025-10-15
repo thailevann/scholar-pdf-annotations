@@ -17,7 +17,6 @@ flowchart LR
   B -- Also scan --> D[Read *.md → split by headings]
   C --> E[Docs]
   D --> E[Docs]
-  B -- No --> F[Fallback: embedded.md sections]
   F --> E
 ```
 
@@ -30,16 +29,19 @@ Use a simple decision heuristic to pick chunking/retrieval/generation strategies
 
 ```mermaid
 flowchart TB
-  Q[Question + Doc characteristics] --> C{Figures present?}
-  C -- Many figures/captions --> G1[Gen: gpt-4o-mini (multimodal)]
-  C -- Mostly text --> G2[Gen: Extractive or gpt-4o-mini text-only]
-  Q --> D{Domain density?}
-  D -- High --> R1[Retriever: hybrid]
-  D -- Moderate/keyword-rich --> R2[Retriever: keyword]
-  D -- Semantics needed --> R3[Retriever: dense]
-  Q --> S{Section structure clear?}
-  S -- Clear --> CH1[Heuristic chunking]
-  S -- Mixed/long --> CH2[Semantic splitter + windowing]
+  Q["Question + Doc characteristics"] --> C{"Figures present?"}
+  C -- "Many figures / captions" --> G1["Gen = gpt4o_mini multimodal"]
+  C -- "Mostly text" --> G2["Gen = Extractive or gpt4o_mini text-only"]
+
+  Q --> D{"Domain density?"}
+  D -- "High" --> R1["Retriever = hybrid"]
+  D -- "Moderate / keyword-rich" --> R2["Retriever = keyword"]
+  D -- "Semantics needed" --> R3["Retriever = dense"]
+
+  Q --> S{"Section structure clear?"}
+  S -- "Clear" --> CH1["Heuristic chunking"]
+  S -- "Mixed / long" --> CH2["Semantic splitter + windowing"]
+
 ```
 
 Practical defaults:
