@@ -13,11 +13,11 @@ flowchart LR
     F --> E
     E --> G[Retrievers: get_retriever]
     G --> H[retrieve(question, image?)]
-    H --> I[Contexts (text + images theo image_policy)]
+    H --> I[Contexts (text &#43; images theo image_policy)]
     A --> J[Generators: get_generator]
     I --> K[Generators: generate]
     J --> K
-    K --> L[Answer + citations]
+    K --> L[Answer &#43; citations]
     L --> M[Logs: runs/last_run_retrieval.json]
 
 ```
