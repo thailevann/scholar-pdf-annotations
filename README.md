@@ -174,7 +174,7 @@ flowchart LR
     C[Retrieved Contexts: text + optional figures] --> P
     P --> M[Call OpenAI GPT Model]
     M --> A[Extract Answer]
-    M --> X[Extract Citations [cN]]
+    M --> X[Extract Citations cN]
     A --> O[Output: answer + citations]
     X --> O
 ```
