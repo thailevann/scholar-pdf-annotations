@@ -60,7 +60,7 @@ flowchart LR
     P[PDF / Document] --> T[Extract Text & Images]
     T --> S[Semantic Chunking using BGE Small + Splitter]
     S --> C[Associate images to nearby text by figure_id]
-    C --> O[Chunks: {doc_id, title, page, text, images/None}]
+    C --> O[Chunks: doc_id, title, page, text, images/None]
 ```
 
 #### Models được sử dụng
