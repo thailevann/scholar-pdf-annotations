@@ -115,6 +115,48 @@ with torch.no_grad():
 * `encode` hỗ trợ **text + optional image**, cho phép multi-modal retrieval.
 * Nếu chunk chỉ có text → truyền `text`.
 * Nếu chunk có cả hình → truyền `text` + `image`.
+## Hybrid Search Flow
+
+Mô tả chi tiết về **Hybrid Search** trong pipeline retrieval.
+
+#### 1. Processing Steps
+
+1. **Keyword Generation**
+
+   * Sử dụng GPT (ví dụ `gpt-4`) để sinh ra danh sách từ khóa từ query.
+2. **Keyword Search**
+
+   * Tìm chunk liên quan dựa trên TF-IDF similarity với các từ khóa.
+3. **Dense Search**
+
+   * Encode query (text + optional image) thành vector embedding.
+   * Tính cosine similarity với dense vectors của chunk.
+4. **Score Merging**
+
+   * Kết hợp score: `score = alpha * dense_score + (1 - alpha) * keyword_score`
+   * Sắp xếp và chọn top-k chunk theo merged score.
+
+#### 2. Output
+
+* Danh sách **top-k chunk liên quan** với:
+
+  * `index` trong corpus
+  * `score` (sau khi kết hợp)
+  * `text` chunk
+  * `metadata` (title, page, images...)
+
+#### 3. Flow Diagram
+
+```mermaid
+flowchart LR
+    Q[User Query: text + optional image] --> G[Generate Keywords using GPT]
+    C[Corpus: TF-IDF + Dense embeddings] --> K[Keyword Search]
+    Q --> D[Dense Search]
+    K --> M[Merge Scores]
+    D --> M
+    M --> O[Output: top-k relevant chunks]
+```
+
 
 ## Answer Generation Flow (`generate`)
 
