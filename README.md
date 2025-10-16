@@ -16,7 +16,7 @@ flowchart LR
 
 Mô tả chi tiết về cách chunk PDF và gắn hình ảnh vào chunk.
 
-##Ê 1. Semantic Chunking
+#### 1. Semantic Chunking
 
 ```python
 _EMBED_MODEL = "BAAI/bge-small-en-v1.5"
@@ -31,12 +31,12 @@ _SPLITTER = SemanticSplitterNodeParser(
 * `buffer_size=1` giúp tránh mất thông tin khi split.
 * `breakpoint_percentile_threshold=95` ưu tiên split tại điểm semantic rõ ràng.
 
-### 2. Image Extraction
+#### 2. Image Extraction
 
 * Hàm `extract_images` quét cú pháp Markdown: `![alt](path)` trong text.
 * Nội suy `figure_id` gần chunk text, để biết hình ảnh liên quan đến đoạn text nào.
 
-### 3. Gắn ảnh vào chunk
+#### 3. Gắn ảnh vào chunk
 
 ```python
 chunks.append({
@@ -53,7 +53,7 @@ chunks.append({
 
 ---
 
-### 4. Flow Chunking + Image Association
+#### 4. Flow Chunking + Image Association
 
 ```mermaid
 flowchart LR
@@ -67,7 +67,7 @@ flowchart LR
 
 Mô tả cách tạo embedding cho **query và chunks** sử dụng model Visualized BGE để retrieval text + image.
 
-### 1. Chuẩn bị model
+#### 1. Chuẩn bị model
 
 * Model: [BAAI/bge-visualized](https://huggingface.co/BAAI/bge-visualized)
 * Hai weight có sẵn: `bge-visualized-base-en-v1.5` và `bge-visualized-m3`
@@ -85,7 +85,7 @@ model = Visualized_BGE(
 model.eval()
 ```
 
-### 2. Tạo embedding cho query
+#### 2. Tạo embedding cho query
 
 ```python
 with torch.no_grad():
@@ -95,7 +95,7 @@ with torch.no_grad():
 * Nếu chỉ có text, truyền **text**.
 * Nếu có text + image, truyền cả 2 (text và đường dẫn image).
 
-### 3. Tạo embedding cho candidate chunk
+#### 3. Tạo embedding cho candidate chunk
 
 ```python
 with torch.no_grad():
@@ -116,6 +116,73 @@ with torch.no_grad():
 * Nếu chunk chỉ có text → truyền `text`.
 * Nếu chunk có cả hình → truyền `text` + `image`.
 
+## Answer Generation Flow (`generate`)
+
+Mô tả flow của hàm `generate` dùng để tạo câu trả lời từ contexts (text + optional image) bằng GPT.
+
+#### 1. Input
+
+* `question`: câu hỏi của người dùng (text)
+* `contexts`: danh sách chunk đã retrieve (text hoặc text + figure)
+* `query_image` (optional): hình ảnh kèm theo câu hỏi
+* `max_tokens`: số lượng token tối đa khi gọi model
+
+#### 2. Processing Steps
+
+**System Prompt Setup**
+
+   * Hướng dẫn model chỉ dùng thông tin từ `contexts`.
+   * Khi dùng context, đánh dấu `[cN]`.
+   * Nếu không biết → nói “I don’t know”.
+```python
+        system = (
+            "You are a helpful assistant. Answer strictly using the provided contexts (text and figures). "
+            "When referencing a context, add a citation marker like [c1], [c2], ... where the number corresponds to the context index shown. "
+            "If unknown, say you don't know."
+        )
+```
+
+**Call Model (OpenAI Chat Completion)**
+
+   * Model: `self.model` ( `gpt-4o-mini`)
+   * Messages: `system` + `user` prompt
+   * Parameters: `max_tokens`, `temperature=0.2`
+
+**Extract Answer & Citations**
+
+   * `answer = resp.choices[0].message.content.strip()`
+   * Dùng regex `\[c(\d+)\]` để lấy citations `[cN]`
+   * Trả về dict:
+
+     ```json
+     {
+       "answer": "<generated answer>",
+       "citations": [list of context indexes]
+     }
+     ```
+
+#### 3. Output
+
+* `answer`: câu trả lời từ model
+* `citations`: index các context được tham chiếu trong answer
+
+#### 4. Flow Diagram
+
+```mermaid
+flowchart LR
+    Q[User Question: text] --> P[Build Prompt]
+    C[Retrieved Contexts: text + optional figures] --> P
+    P --> M[Call OpenAI GPT Model]
+    M --> A[Extract Answer]
+    M --> X[Extract Citations [cN]]
+    A --> O[Output: answer + citations]
+    X --> O
+```
+
+* **Q + C → P**: tạo prompt kết hợp question và contexts
+* **P → M**: gửi prompt tới GPT
+* **M → A + X**: lấy answer và citations từ response
+* **A + X → O**: output cuối cùng trả về user
 
 
 
