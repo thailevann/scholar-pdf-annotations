@@ -5,21 +5,11 @@ Mô tả flow tổng quan của phần QA và liệt kê model/kỹ thuật đư
 #### Flow tổng quan
 ```mermaid
 flowchart LR
-    A[PipelineConfig] --> B[Loaders: load_parsed_jsons]
-    B --> C[Chunking: split_sections_into_chunks]
-    C --> D[Retrievers: build_corpus]
-    D --> E[Retrievers: build_store dense and TF-IDF]
-    A --> F[Embeddings: get_embedder]
-    F --> E
-    E --> G[Retrievers: get_retriever]
-    G --> H[retrieve question with optional image]
-    H --> I[Contexts text and images according to image_policy]
-    A --> J[Generators: get_generator]
-    I --> K[Generators: generate answer]
-    J --> K
-    K --> L[Answer and citations]
-    L --> M[Logs runs/last_run_retrieval.json]
-
+    U[User Query: text + image] --> E[Embedding]
+    E --> C[Chunking PDF / Docs]
+    C --> R[Hybrid Retrieval: Dense + TF-IDF]
+    R --> G[Generator: GPT]
+    G --> O[Output: Answer + Citations]
 ```
 
 #### Models được sử dụng
