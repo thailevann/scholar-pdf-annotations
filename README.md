@@ -16,7 +16,7 @@ flowchart LR
 
 Mô tả chi tiết về cách chunk PDF và gắn hình ảnh vào chunk.
 
-## 1. Semantic Chunking
+##Ê 1. Semantic Chunking
 
 ```python
 _EMBED_MODEL = "BAAI/bge-small-en-v1.5"
@@ -63,24 +63,59 @@ flowchart LR
     C --> O[Chunks: doc_id, title, page, text, images/None]
 ```
 
-#### Models được sử dụng
-- Visualized_BGE (`Visualized_m3.pth`) cho embedding: hỗ trợ text và image+text (compose) cho truy vấn/chunks.
-- OpenAI Chat Completions (mặc định `gpt-4o-mini`) cho sinh câu trả lời đa phương thức (multimodal) và trích `[cN]` citations.
-- Ollama (`llama3.1:8b-instruct`) như lựa chọn sinh text-only khi không dùng OpenAI.
+## Multi-Modal Embedding using Visualized BGE
 
-#### Kỹ thuật chính
-- RAG pipeline: Retrieve (dense/keyword/hybrid) → Generate (LLM).
-- Chunking:
-  - Semantic splitting via `llama_index` (nếu khả dụng), fallback heuristic theo đoạn + cửa sổ `max_chars/overlap`.
-  - Trích ảnh từ Markdown `![alt](path)` và gán vào chunk theo `figure_id`.
-- Retrieval:
-  - Dense search với cosine similarity trên vector ảnh+text hoặc text-only.
-  - Keyword search bằng TF-IDF bigrams.
-  - Hybrid search kết hợp điểm dense + keyword; từ khóa sinh bởi GPT.
-- Generation:
-  - Multimodal prompt (contexts text + ảnh được chọn) với OpenAI; lựa chọn ảnh theo score/token overlap hoặc include-all.
-  - Fallback Extractive (TF-IDF + cosine) khi LLM lỗi/thiếu API.
-- Citations: parse các marker `[cN]` từ câu trả lời để sắp xếp và xuất trích dẫn.
+Mô tả cách tạo embedding cho **query và chunks** sử dụng model Visualized BGE để retrieval text + image.
+
+### 1. Chuẩn bị model
+
+* Model: [BAAI/bge-visualized](https://huggingface.co/BAAI/bge-visualized)
+* Hai weight có sẵn: `bge-visualized-base-en-v1.5` và `bge-visualized-m3`
+* Chọn `bge-visualized-m3` để hỗ trợ **multi-language**.
+
+```python
+import torch
+from visual_bge.modeling import Visualized_BGE
+
+# Load model với weight đã tải
+model = Visualized_BGE(
+    model_name_bge="BAAI/bge-base-en-v1.5",
+    model_weight="path/to/bge-visualized-m3.pth"
+)
+model.eval()
+```
+
+### 2. Tạo embedding cho query
+
+```python
+with torch.no_grad():
+    query_emb = model.encode(text="Are there sidewalks on both sides of the Mid-Hudson Bridge?")
+```
+
+* Nếu chỉ có text, truyền **text**.
+* Nếu có text + image, truyền cả 2 (text và đường dẫn image).
+
+### 3. Tạo embedding cho candidate chunk
+
+```python
+with torch.no_grad():
+    candi_emb_1 = model.encode(
+        text="The Mid-Hudson Bridge, spanning the Hudson River between Poughkeepsie and Highland.",
+        image="./imgs/wiki_candi_1.jpg"
+    )
+    candi_emb_2 = model.encode(
+        text="Golden_Gate_Bridge",
+        image="./imgs/wiki_candi_2.jpg"
+    )
+    candi_emb_3 = model.encode(
+        text="The Mid-Hudson Bridge was designated as a New York State Historic Civil Engineering Landmark by the American Society of Civil Engineers in 1983. The bridge was renamed the \"Franklin Delano Roosevelt Mid-Hudson Bridge\" in 1994."
+    )
+```
+
+* `encode` hỗ trợ **text + optional image**, cho phép multi-modal retrieval.
+* Nếu chunk chỉ có text → truyền `text`.
+* Nếu chunk có cả hình → truyền `text` + `image`.
+
 
 
 
