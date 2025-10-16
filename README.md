@@ -1,8 +1,8 @@
-### QA Overview
+# QA Overview
 
 Mô tả flow tổng quan của phần QA và liệt kê model/kỹ thuật được sử dụng.
 
-#### Flow tổng quan
+## Flow tổng quan
 ```mermaid
 flowchart LR
     U[User Query: text + image] --> E[Embedding]
@@ -12,25 +12,14 @@ flowchart LR
     G --> O[Output: Answer + Citations]
 ```
 
-# PDF Chunking and Image Extraction
+## PDF Chunking and Image Extraction
 
 Mô tả chi tiết về cách chunk PDF và gắn hình ảnh vào chunk.
 
-## 1. Embedding Model
+## 1. Semantic Chunking
 
 ```python
-_EMBED_MODEL = HuggingFaceEmbedding(
-    model_name="BAAI/bge-small-en-v1.5",
-    device=_DEVICE
-)
-```
-
-* Sử dụng BGE Small v1.5 để tạo embedding cho text.
-* Chạy trên GPU/CPU tuỳ `_DEVICE`.
-
-## 2. Semantic Chunking
-
-```python
+_EMBED_MODEL = "BAAI/bge-small-en-v1.5"
 _SPLITTER = SemanticSplitterNodeParser(
     buffer_size=1,
     breakpoint_percentile_threshold=95,
@@ -42,7 +31,7 @@ _SPLITTER = SemanticSplitterNodeParser(
 * `buffer_size=1` giúp tránh mất thông tin khi split.
 * `breakpoint_percentile_threshold=95` ưu tiên split tại điểm semantic rõ ràng.
 
-## 3. Image Extraction
+### 2. Image Extraction
 
 * Hàm `extract_images` quét cú pháp Markdown: `![alt](path)` trong text.
 * Nội suy `figure_id` gần chunk text, để biết hình ảnh liên quan đến đoạn text nào.
