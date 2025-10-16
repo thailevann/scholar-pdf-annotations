@@ -8,7 +8,7 @@ flowchart LR
     A[PipelineConfig] --> B[Loaders: load_parsed_jsons]
     B --> C[Chunking: split_sections_into_chunks]
     C --> D[Retrievers: build_corpus]
-    D --> E[Retrievers: build_store (dense + TF-IDF)]
+    D --> E[Retrievers: build_store (dense and TF-IDF)]
     A --> F[Embeddings: get_embedder]
     F --> E
     E --> G[Retrievers: get_retriever]
@@ -19,6 +19,7 @@ flowchart LR
     J --> K
     K --> L[Answer + citations]
     L --> M[Logs: runs/last_run_retrieval.json]
+
 ```
 
 #### Models được sử dụng
