@@ -8,17 +8,17 @@ flowchart LR
     A[PipelineConfig] --> B[Loaders: load_parsed_jsons]
     B --> C[Chunking: split_sections_into_chunks]
     C --> D[Retrievers: build_corpus]
-    D --> E[Retrievers: build_store (dense and TF-IDF)]
+    D --> E[Retrievers: build_store dense and TF-IDF]
     A --> F[Embeddings: get_embedder]
     F --> E
     E --> G[Retrievers: get_retriever]
-    G --> H[retrieve(question, image?)]
-    H --> I[Contexts (text &#43; images theo image_policy)]
+    G --> H[retrieve question with optional image]
+    H --> I[Contexts text and images according to image_policy]
     A --> J[Generators: get_generator]
-    I --> K[Generators: generate]
+    I --> K[Generators: generate answer]
     J --> K
-    K --> L[Answer &#43; citations]
-    L --> M[Logs: runs/last_run_retrieval.json]
+    K --> L[Answer and citations]
+    L --> M[Logs runs/last_run_retrieval.json]
 
 ```
 
