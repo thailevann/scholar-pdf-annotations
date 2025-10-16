@@ -1,8 +1,8 @@
 # QA Overview
 
-Mô tả flow tổng quan của phần QA và liệt kê model/kỹ thuật được sử dụng.
+Overview of the QA flow and listing of models/techniques used.
 
-## Flow tổng quan
+## Overall Flow
 ```mermaid
 flowchart LR
     U[User Query: text + image] --> E[Embedding]
@@ -14,7 +14,7 @@ flowchart LR
 
 ## PDF Chunking and Image Extraction
 
-Mô tả chi tiết về cách chunk PDF và gắn hình ảnh vào chunk.
+Detailed description of how to chunk PDFs and attach images to chunks.
 
 #### 1. Semantic Chunking
 
@@ -27,16 +27,16 @@ _SPLITTER = SemanticSplitterNodeParser(
 )
 ```
 
-* Chia PDF/document thành các semantic chunk dựa trên embedding similarity.
-* `buffer_size=1` giúp tránh mất thông tin khi split.
-* `breakpoint_percentile_threshold=95` ưu tiên split tại điểm semantic rõ ràng.
+* Split PDF/documents into semantic chunks based on embedding similarity.
+* buffer_size=1 prevents information loss when splitting.
+* breakpoint_percentile_threshold=95 favors splitting at clear semantic boundaries.
 
 #### 2. Image Extraction
 
-* Hàm `extract_images` quét cú pháp Markdown: `![alt](path)` trong text.
-* Nội suy `figure_id` gần chunk text, để biết hình ảnh liên quan đến đoạn text nào.
+* The `extract_images` function scans Markdown syntax: `![alt](path)` in the text.
+* Interpolates `figure_id` near the text chunk to identify which images are related to the text.
 
-#### 3. Gắn ảnh vào chunk
+#### 3. Attach Images to Chunks
 
 ```python
 chunks.append({
@@ -46,10 +46,9 @@ chunks.append({
     "text": chunk_text,
     "images": chunk_images if chunk_images else None
 })
-```
 
-* Nếu không có hình liên quan → `"images": None`.
-* Nếu có → `"images"` là danh sách path / metadata của hình liên quan.
+* If no related images → "images": None.
+* If there are related images → "images" is a list of paths / metadata of the images.
 
 ---
 
@@ -65,37 +64,35 @@ flowchart LR
 
 ## Multi-Modal Embedding using Visualized BGE
 
-Mô tả cách tạo embedding cho **query và chunks** sử dụng model Visualized BGE để retrieval text + image.
+Describes how to create embeddings for **queries and chunks** using the Visualized BGE model for text + image retrieval.
 
-#### 1. Chuẩn bị model
+#### 1. Prepare the Model
 
 * Model: [BAAI/bge-visualized](https://huggingface.co/BAAI/bge-visualized)
-* Hai weight có sẵn: `bge-visualized-base-en-v1.5` và `bge-visualized-m3`
-* Chọn `bge-visualized-m3` để hỗ trợ **multi-language**.
+* Two available weights: `bge-visualized-base-en-v1.5` and `bge-visualized-m3`
+* Use `bge-visualized-m3` to support **multi-language**.
 
 ```python
 import torch
 from visual_bge.modeling import Visualized_BGE
 
-# Load model với weight đã tải
+# Load the model with the downloaded weight
 model = Visualized_BGE(
     model_name_bge="BAAI/bge-base-en-v1.5",
     model_weight="path/to/bge-visualized-m3.pth"
 )
 model.eval()
-```
 
-#### 2. Tạo embedding cho query
+#### 2. Create Embedding for Query
 
 ```python
 with torch.no_grad():
     query_emb = model.encode(text="Are there sidewalks on both sides of the Mid-Hudson Bridge?")
-```
 
-* Nếu chỉ có text, truyền **text**.
-* Nếu có text + image, truyền cả 2 (text và đường dẫn image).
+* If only text is available, pass text.
+* If both text and image are available, pass both text and the image path.
 
-#### 3. Tạo embedding cho candidate chunk
+#### 3. Create Embedding for Candidate Chunks
 
 ```python
 with torch.no_grad():
@@ -112,33 +109,39 @@ with torch.no_grad():
     )
 ```
 
-* `encode` hỗ trợ **text + optional image**, cho phép multi-modal retrieval.
-* Nếu chunk chỉ có text → truyền `text`.
-* Nếu chunk có cả hình → truyền `text` + `image`.
+* encode supports text + optional image, enabling multi-modal retrieval.
+* If a chunk only has text → pass text.
+* If a chunk has both text and image → pass text + image.
+* 
 ## Hybrid Search Flow
 
-Mô tả chi tiết về **Hybrid Search** trong pipeline retrieval.
+Detailed description of **Hybrid Search** in the retrieval pipeline.
 
 #### 1. Processing Steps
 
 1. **Keyword Generation**
 
-   * Sử dụng GPT (ví dụ `gpt-4`) để sinh ra danh sách từ khóa từ query.
+   * Use GPT (e.g., `gpt-4`) to generate a list of keywords from the query.
+
 2. **Keyword Search**
 
-   * Tìm chunk liên quan dựa trên TF-IDF similarity với các từ khóa.
+   * Retrieve chunks based on TF-IDF similarity with the generated keywords.
+
 3. **Dense Search**
 
-   * Encode query (text + optional image) thành vector embedding.
-   * Tính cosine similarity với dense vectors của chunk.
+   * Encode the query (text + optional image) into a vector embedding.
+   * Compute cosine similarity with the dense vectors of the chunks.
+
 4. **Score Merging**
 
-   * Kết hợp score: `score = alpha * dense_score + (1 - alpha) * keyword_score`
+   * Combine scores: `score = alpha * dense_score + (1 - alpha) * keyword_score`
+   * Rank and select the top-k chunks according to the merged score.
+ - alpha) * keyword_score`
    * Sắp xếp và chọn top-k chunk theo merged score.
 
 #### 2. Output
 
-* Danh sách **top-k chunk liên quan** với:
+* List of **top-k relevant chunks** with:
 
   * `index` trong corpus
   * `score` (sau khi kết hợp)
@@ -160,29 +163,29 @@ flowchart LR
 
 ## Answer Generation Flow (`generate`)
 
-Mô tả flow của hàm `generate` dùng để tạo câu trả lời từ contexts (text + optional image) bằng GPT.
+Describes the flow of the `generate` function used to produce answers from contexts (text + optional image) using GPT.
 
 #### 1. Input
 
-* `question`: câu hỏi của người dùng (text)
-* `contexts`: danh sách chunk đã retrieve (text hoặc text + figure)
-* `query_image` (optional): hình ảnh kèm theo câu hỏi
-* `max_tokens`: số lượng token tối đa khi gọi model
+* `question`: the user's question (text)
+* `contexts`: list of retrieved chunks (text or text + figure)
+* `query_image` (optional): image accompanying the question
+* `max_tokens`: maximum number of tokens for the model call
 
 #### 2. Processing Steps
 
 **System Prompt Setup**
 
-   * Hướng dẫn model chỉ dùng thông tin từ `contexts`.
-   * Khi dùng context, đánh dấu `[cN]`.
-   * Nếu không biết → nói “I don’t know”.
+* Instruct the model to only use information from the `contexts`.
+* When using a context, mark it as `[cN]`.
+* If the answer is unknown → respond with “I don’t know”.
+
 ```python
-        system = (
-            "You are a helpful assistant. Answer strictly using the provided contexts (text and figures). "
-            "When referencing a context, add a citation marker like [c1], [c2], ... where the number corresponds to the context index shown. "
-            "If unknown, say you don't know."
-        )
-```
+system = (
+    "You are a helpful assistant. Answer strictly using the provided contexts (text and figures). "
+    "When referencing a context, add a citation marker like [c1], [c2], ... where the number corresponds to the context index shown. "
+    "If unknown, say you don't know."
+)
 
 **Call Model (OpenAI Chat Completion)**
 
@@ -205,8 +208,9 @@ Mô tả flow của hàm `generate` dùng để tạo câu trả lời từ cont
 
 #### 3. Output
 
-* `answer`: câu trả lời từ model
-* `citations`: index các context được tham chiếu trong answer
+* `answer`: the answer generated by the model
+* `citations`: indices of the contexts referenced in the answer
+
 
 #### 4. Flow Diagram
 
@@ -221,10 +225,10 @@ flowchart LR
     X --> O
 ```
 
-* **Q + C → P**: tạo prompt kết hợp question và contexts
-* **P → M**: gửi prompt tới GPT
-* **M → A + X**: lấy answer và citations từ response
-* **A + X → O**: output cuối cùng trả về user
+* **Q + C → P**: create a prompt combining the question and contexts  
+* **P → M**: send the prompt to GPT  
+* **M → A + X**: extract the answer and citations from the model response  
+* **A + X → O**: produce the final output returned to the user
 
 
 # QA Output Comparison: Query With vs Without Image
