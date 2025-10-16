@@ -36,7 +36,7 @@ _SPLITTER = SemanticSplitterNodeParser(
 * Hàm `extract_images` quét cú pháp Markdown: `![alt](path)` trong text.
 * Nội suy `figure_id` gần chunk text, để biết hình ảnh liên quan đến đoạn text nào.
 
-## 4. Gắn ảnh vào chunk
+### 3. Gắn ảnh vào chunk
 
 ```python
 chunks.append({
@@ -53,7 +53,7 @@ chunks.append({
 
 ---
 
-## 5. Flow Chunking + Image Association
+### 4. Flow Chunking + Image Association
 
 ```mermaid
 flowchart LR
@@ -62,12 +62,6 @@ flowchart LR
     S --> C[Associate images to nearby text by figure_id]
     C --> O[Chunks: {doc_id, title, page, text, images/None}]
 ```
-
-* **P → T**: đọc PDF, trích xuất text và Markdown images.
-* **T → S**: chia text thành semantic chunks dựa trên embedding similarity.
-* **S → C**: nội suy `figure_id` để gắn ảnh gần chunk.
-* **C → O**: output là list chunk, mỗi chunk chứa text + optional images.
-
 
 #### Models được sử dụng
 - Visualized_BGE (`Visualized_m3.pth`) cho embedding: hỗ trợ text và image+text (compose) cho truy vấn/chunks.
