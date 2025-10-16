@@ -227,5 +227,15 @@ flowchart LR
 * **A + X → O**: output cuối cùng trả về user
 
 
+# Comparison of QA Output: Query With vs Without Image
 
+| Feature | Query without Image | Query with Image |
+|---------|-------------------|----------------|
+| **Question** | different of this image and method of this paper | different of this image and method of this paper <img width="781" height="378" alt="cross_attention_" src="https://github.com/user-attachments/assets/43170c97-2011-4161-b73a-bb79ebe98ac4" />
+|
+| **Generator** | openai | openai |
+| **Answer** | I don't know. | The image depicts the architecture of the Transformer model, specifically illustrating the cross-attention mechanism involving queries, keys, and values, which are essential components in the attention mechanism. The encoder output and decoder output interact through these components to produce hidden states, as shown in the diagram.<br><br>In contrast, the methods described in the paper focus on the efficiency of self-attention compared to convolutional layers, highlighting the complexity and interpretability of self-attention models. The paper also discusses multi-head attention, which allows the model to attend to different representation subspaces simultaneously, enhancing its ability to capture various aspects of the input data [c1][c2][c5].<br><br>Thus, while the image provides a visual representation of the Transformer architecture, the paper elaborates on the theoretical underpinnings and advantages of using self-attention and multi-head attention in model design. |
+| **Cited Sections** | - 3.2.1 Scaled Dot-Product Attention (page 10)<br>- 6.3 English Constituency Parsing (page 25)<br>- 3.5 Positional Encoding (page 15) | - 3 Model Architecture (page 6)<br>- 3.2.2 Multi-Head Attention (page 11)<br>- 4 Why Self-Attention (page 16) |
+| **Figures** | None | - Figure [url: /static/paperreader/services/parser/output/RqSzlUikuLQAAAABJRU5ErkJggg==]<br>- Figure [url: /static/paperreader/services/parser/output/image_000000_536d6dc5957170c29984f94ad0ddf7c2faaaf2cd88b962d1b385f13acf5ba66f.png]<img width="442" height="642" alt="image_000000_536d6dc5957170c29984f94ad0ddf7c2faaaf2cd88b962d1b385f13acf5ba66f" src="https://github.com/user-attachments/assets/00a6613c-122c-4c0d-96d8-f085bec5cfe6" />
+ |
 
