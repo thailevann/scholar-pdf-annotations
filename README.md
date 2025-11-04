@@ -251,3 +251,322 @@ flowchart LR
 ![Figure 1](https://github.com/user-attachments/assets/00a6613c-122c-4c0d-96d8-f085bec5cfe6)
 
 
+# QA Flow Diagram
+
+## Overview
+Flow diagram của hệ thống Question Answering (QA) trong PaperReader, từ khi người dùng hỏi câu hỏi đến khi nhận được câu trả lời với citations.
+
+## Flow Diagram
+
+```mermaid
+flowchart TD
+    Start([Người dùng mở QA Interface]) --> InitSession[Khởi tạo Session]
+    
+    InitSession --> CheckLocalStorage{Kiểm tra localStorage<br/>có session_id?}
+    CheckLocalStorage -->|Có| VerifySession[Verify session với backend]
+    CheckLocalStorage -->|Không| CreateSession[POST /api/chat/sessions<br/>Tạo session mới]
+    
+    VerifySession -->|Session hợp lệ| LoadHistory[Load chat history từ backend]
+    VerifySession -->|Session không tồn tại| CreateSession
+    LoadHistory --> SaveToLocal[Lưu session_id và messages vào localStorage]
+    
+    CreateSession --> SaveSession[Lưu session_id vào localStorage]
+    SaveSession --> CheckPipeline[Kiểm tra Pipeline Status]
+    SaveToLocal --> CheckPipeline
+    
+    CheckPipeline --> PollStatus[GET /api/qa/status<br/>Poll mỗi 2 giây]
+    PollStatus --> PipelineReady{Pipeline ready?}
+    PipelineReady -->|Chưa| ShowProgress[Hiển thị progress bar<br/>Building index...]
+    ShowProgress --> PollStatus
+    PipelineReady -->|Sẵn sàng| ReadyUI[UI sẵn sàng<br/>Cho phép nhập câu hỏi]
+    
+    ReadyUI --> UserQuestion[Người dùng nhập câu hỏi<br/>và nhấn Ask/Send]
+    UserQuestion --> ValidateQuestion{Câu hỏi hợp lệ?}
+    ValidateQuestion -->|Không| ShowError[Hiển thị lỗi]
+    ValidateQuestion -->|Có| SendQuestion[POST /api/chat/ask<br/>Gửi câu hỏi đến backend]
+    
+    SendQuestion --> BackendReceive[Backend nhận request<br/>/api/chat/ask]
+    BackendReceive --> GetChatHistory[Lấy chat history từ MongoDB<br/>theo session_id]
+    GetChatHistory --> GetPipeline[Lấy/cache QA Pipeline<br/>get_pipeline config]
+    
+    GetPipeline --> PipelineAnswer[Pipeline.answer<br/>question, chat_history]
+    
+    PipelineAnswer --> Retrieve[Retrieval Phase]
+    Retrieve --> HybridRetrieval[Hybrid Retrieval:<br/>- Dense: Visualized_BGE embeddings<br/>- Sparse: BM25 keyword search<br/>- Fusion: Kết hợp kết quả<br/>- Rerank: Cross-encoder reranking]
+    
+    HybridRetrieval --> GetTopK[Lấy top_k chunks<br/>theo relevance score]
+    GetTopK --> Generate[Generation Phase]
+    
+    Generate --> LLMGenerate[LLM Generator OpenAI GPT-4:<br/>- Input: question, contexts, chat_history<br/>- Generate: answer với citation markers [cN]<br/>- Output: answer text]
+    
+    LLMGenerate --> ExtractCitations[Extract Citations:<br/>- Parse [cN] markers từ answer<br/>- Map citations với retrieved chunks<br/>- Build cited_sections array]
+    
+    ExtractCitations --> CalculateConfidence[Tính confidence score<br/>từ retriever scores]
+    CalculateConfidence --> SaveMessage[Lưu message vào MongoDB:<br/>- User message<br/>- Assistant message với metadata]
+    
+    SaveMessage --> ReturnResponse[Trả về response:<br/>answer, cited_sections, confidence]
+    
+    ReturnResponse --> FrontendReceive[Frontend nhận response]
+    FrontendReceive --> CreateQAMessage[Tạo QAMessage object:<br/>- question<br/>- answer<br/>- cited_sections<br/>- confidence<br/>- timestamp]
+    
+    CreateQAMessage --> UpdateUI[Cập nhật UI:<br/>- Thêm vào messages array<br/>- Hiển thị answer<br/>- Hiển thị citations<br/>- Hiển thị confidence bar]
+    
+    UpdateUI --> SaveLocalStorage[Lưu messages vào localStorage<br/>để persist qua refresh]
+    SaveLocalStorage --> NotifyParent[Gọi onNewMessage callback<br/>nếu có]
+    NotifyParent --> End([Hiển thị câu trả lời cho người dùng])
+    
+    ShowError --> ReadyUI
+    
+    style Start fill:#e1f5ff
+    style End fill:#d4edda
+    style Retrieve fill:#fff3cd
+    style Generate fill:#fff3cd
+    style LLMGenerate fill:#f8d7da
+    style UpdateUI fill:#d1ecf1
+```
+
+## Component Flow
+
+### 1. Frontend Components
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant QAInterface
+    participant NextJS API
+    participant Backend API
+    participant MongoDB
+    participant Pipeline
+    
+    User->>QAInterface: Mở QA Interface
+    QAInterface->>QAInterface: Load từ localStorage
+    QAInterface->>NextJS API: POST /api/chat/sessions
+    NextJS API->>Backend API: POST /api/chat/sessions
+    Backend API->>MongoDB: Tạo session mới
+    MongoDB-->>Backend API: session_id
+    Backend API-->>NextJS API: session_id
+    NextJS API-->>QAInterface: session_id
+    QAInterface->>QAInterface: Lưu session_id vào localStorage
+    
+    loop Mỗi 2 giây
+        QAInterface->>NextJS API: GET /api/qa/status
+        NextJS API->>Backend API: GET /api/pdf/status
+        Backend API-->>NextJS API: {ready, building, percent}
+        NextJS API-->>QAInterface: Pipeline status
+        alt Pipeline chưa ready
+            QAInterface->>QAInterface: Hiển thị progress bar
+        else Pipeline ready
+            QAInterface->>QAInterface: Cho phép nhập câu hỏi
+        end
+    end
+    
+    User->>QAInterface: Nhập câu hỏi và nhấn Ask
+    QAInterface->>NextJS API: POST /api/chat/ask
+    NextJS API->>Backend API: POST /api/chat/ask
+    
+    Backend API->>MongoDB: Lấy chat history
+    MongoDB-->>Backend API: chat_history[]
+    
+    Backend API->>Pipeline: pipeline.answer(question, chat_history)
+    Pipeline->>Pipeline: Hybrid Retrieval
+    Pipeline->>Pipeline: LLM Generation
+    Pipeline-->>Backend API: {answer, cited_sections, confidence}
+    
+    Backend API->>MongoDB: Lưu user message
+    Backend API->>MongoDB: Lưu assistant message
+    MongoDB-->>Backend API: Success
+    
+    Backend API-->>NextJS API: {answer, cited_sections, confidence}
+    NextJS API-->>QAInterface: Response
+    QAInterface->>QAInterface: Lưu vào localStorage
+    QAInterface->>User: Hiển thị answer với citations
+```
+
+## Data Flow
+
+### Request Flow
+
+```
+User Input
+    ↓
+QAInterface Component
+    ↓
+POST /api/chat/ask (Next.js API Route)
+    ↓
+POST /api/chat/ask (Backend FastAPI)
+    ↓
+ChatService.get_history(session_id)
+    ↓
+QAPipeline.answer(question, chat_history)
+    ↓
+Retriever.retrieve() → Generator.generate()
+    ↓
+Response
+```
+
+### Response Flow
+
+```
+QAPipeline Result
+    ↓
+{answer, cited_sections, confidence}
+    ↓
+ChatService.add_message() → MongoDB
+    ↓
+Backend API Response
+    ↓
+Next.js API Response
+    ↓
+QAInterface Update State
+    ↓
+localStorage Persistence
+    ↓
+UI Display
+```
+
+## Key Components
+
+### 1. Frontend: `QAInterface` Component
+- **Location**: `components/qa-interface.tsx`
+- **Responsibilities**:
+  - Quản lý session (tạo/verify/restore)
+  - Polling pipeline status
+  - Gửi câu hỏi và nhận câu trả lời
+  - Hiển thị Q&A history
+  - Lưu trữ local (localStorage)
+
+### 2. Frontend API: `/api/chat/ask`
+- **Location**: `app/api/chat/ask/route.ts`
+- **Responsibilities**:
+  - Proxy request đến backend
+  - Map response format
+  - Error handling
+
+### 3. Frontend API: `/api/chat/sessions`
+- **Location**: `app/api/chat/sessions/route.ts`
+- **Responsibilities**:
+  - Tạo session mới
+  - Lấy session info
+  - Proxy đến backend
+
+### 4. Frontend API: `/api/qa/status`
+- **Location**: `app/api/qa/status/route.ts`
+- **Responsibilities**:
+  - Kiểm tra pipeline readiness
+  - Proxy đến backend `/api/pdf/status`
+
+### 5. Backend API: `/api/chat/ask`
+- **Location**: `backend/src/paperreader/api/chat_routes.py`
+- **Responsibilities**:
+  - Nhận question và session_id
+  - Lấy chat history từ MongoDB
+  - Gọi QA Pipeline
+  - Lưu messages vào MongoDB
+  - Trả về answer với citations
+
+### 6. Backend: QA Pipeline
+- **Location**: `backend/src/paperreader/services/qa/pipeline.py`
+- **Components**:
+  - **Retriever**: Hybrid retrieval (dense + sparse + rerank)
+  - **Generator**: LLM-based answer generation
+  - **Citation Extraction**: Parse [cN] markers và map với chunks
+
+### 7. Backend: Retrieval System
+- **Location**: `backend/src/paperreader/services/qa/retrievers.py`
+- **Methods**:
+  - Dense retrieval: Vector similarity search
+  - Sparse retrieval: BM25 keyword search
+  - Hybrid: Fusion của cả hai
+  - Reranking: Cross-encoder để rank lại
+
+### 8. Backend: Generator
+- **Location**: `backend/src/paperreader/services/qa/generators.py`
+- **Types**:
+  - OpenAI GPT-4: Primary generator
+  - ExtractiveGenerator: Fallback
+
+## State Management
+
+### Frontend State (QAInterface)
+```typescript
+- sessionId: string | null
+- messages: QAMessage[]
+- isLoading: boolean
+- isPipelineReady: boolean | null
+- pipelineStatus: { building, ready, chunks, percent, stage }
+- question: string
+- showHistory: boolean
+```
+
+### Backend State
+```python
+- Pipeline cache: Keyed by PDF hash
+- Vector store: In-memory embeddings
+- MongoDB: Chat sessions và messages
+```
+
+## Error Handling
+
+### Frontend
+- Session initialization errors → Toast notification
+- Pipeline not ready → Block input, show progress
+- API errors → Error toast với retry option
+- localStorage errors → Log warning, continue
+
+### Backend
+- Pipeline errors → Fallback to ExtractiveGenerator
+- MongoDB errors → HTTP 503 Service Unavailable
+- Timeout errors → HTTP 504 Gateway Timeout
+- Validation errors → HTTP 400 Bad Request
+
+## Performance Optimizations
+
+1. **Pipeline Caching**: Pipeline được cache theo PDF hash, chỉ rebuild khi PDF thay đổi
+2. **localStorage Caching**: Messages được cache local để instant restore
+3. **Session Persistence**: Session được lưu trong MongoDB và localStorage
+4. **Async Processing**: Pipeline.answer() chạy async
+5. **Polling Optimization**: Pipeline status được poll mỗi 2 giây, dừng khi ready
+
+## Citation System
+
+### Citation Format
+- Answer text chứa markers: `[c1]`, `[c2]`, ...
+- Citations được extract bằng regex: `\[c(\d+)\]`
+- Mỗi citation map với một retrieved chunk
+- Cited sections bao gồm:
+  - `citation_number`: Số thứ tự citation
+  - `doc_id`: Document ID
+  - `title`: Tiêu đề section
+  - `page`: Số trang
+  - `excerpt`: Đoạn text được cite
+
+## Chat History
+
+### Format
+```python
+[
+  {
+    "role": "user",
+    "content": "What is the main finding?",
+    "timestamp": "2024-01-01T00:00:00Z",
+    "metadata": {}
+  },
+  {
+    "role": "assistant",
+    "content": "The main finding is...",
+    "timestamp": "2024-01-01T00:00:01Z",
+    "metadata": {
+      "cited_sections": [...],
+      "confidence": 0.89
+    }
+  }
+]
+```
+
+### Usage
+- Chat history được truyền vào generator để context-aware generation
+- History được lưu trong MongoDB theo session_id
+- Frontend restore history từ localStorage và backend
+
+
+
